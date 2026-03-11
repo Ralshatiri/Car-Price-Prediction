@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"JetBrains Mono"', 'monospace'],
+                    },
+                    keyframes: {
+                        fadeInUp: {
+                            '0%': { opacity: '0', transform: 'translateY(20px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                    },
+                    animation: {
+                        fadeInUp: 'fadeInUp 0.6s ease-out forwards',
+                    }
+                }
+            }
+        }
+    </script>
+    <script src="components/dropdown.js"></script>
+    <title>Car Price Prediction</title>
+    <style>
+        body {
+            background: #080b10;
+            background-image:
+                radial-gradient(ellipse at 15% 50%, rgba(220, 38, 38, 0.05) 0%, transparent 55%),
+                radial-gradient(ellipse at 85% 20%, rgba(234, 88, 12, 0.04) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 90%, rgba(109, 40, 217, 0.04) 0%, transparent 50%);
+        }
+        .glass {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            backdrop-filter: blur(20px);
+        }
+        .section-label {
+            font-size: 0.6rem;
+            letter-spacing: 0.35em;
+            text-transform: uppercase;
+            color: rgba(156,163,175,0.5);
+            margin-bottom: 0.75rem;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen flex flex-col font-sans text-white">
+
+    <section class="flex flex-col items-center pt-16 pb-8 px-6 animate-fadeInUp">
+        <div class="flex items-center gap-3 mb-6">
+            <svg class="w-6 h-6 text-red-500/70" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 0 0-3.213-9.193 2.056 2.056 0 0 0-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 0 0-10.026 0 1.106 1.106 0 0 0-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12"/>
+            </svg>
+            <span class="text-xs tracking-[0.4em] text-red-400/50 uppercase">KSA Used Car Valuation</span>
+        </div>
+        <h1 class="text-5xl font-light text-white mb-3 tracking-tight">
+            What's Your Car Worth?
+        </h1>
+        <p class="text-gray-600 text-sm">Enter your car details and get an instant AI price estimate</p>
+    </section>
+
+    <div class="w-full max-w-3xl mx-auto h-px bg-gradient-to-r from-transparent via-red-900/30 to-transparent mb-8"></div>
+
+    <section class="flex justify-center px-6 flex-1 mb-8">
+        <div class="glass rounded-2xl p-8 w-full max-w-3xl">
+
+            <p class="section-label">Vehicle Identity</p>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+                <div id="1stbox"></div>
+                <script>loadComponent("1stbox", "Make", ["Aston Martin","Audi","Bentley","BMW","BYD","Cadillac","Changan","Chery","Chevrolet","Chrysler","Classic","Daihatsu","Dodge","FAW","Ferrari","Fiat","Foton","GAC","Geely","Genesis","GMC","Great Wall","HAVAL","Honda","Hummer","Hyundai","INFINITI","Isuzu","Iveco","Jaguar","Jeep","Kia","Land Rover","Lexus","Lifan","Lincoln","Maserati","Mazda","Mercedes","Mercury","MG","MINI","Mitsubishi","Nissan","Other","Peugeot","Porsche","Renault","Rolls-Royce","Subaru","Suzuki","Tata","Toyota","Victory Auto","Volkswagen","Zhengzhou"])</script>
+
+                <div id="2ndbox"></div>
+                <script>loadComponent("2ndbox", "Type", [])</script>
+                <script>linkDropdowns("1stbox", "2ndbox", carModels)</script>
+
+                <div id="3rdbox"></div>
+                <script>loadComponent("3rdbox", "Options", ["Full","Semi Full","Standard"])</script>
+
+                <div id="4thbox"></div><script>
+                    const years = [];
+                    for (let y = new Date().getFullYear(); y >= 1964; y--) years.push(y);
+                    loadComponent("4thbox", "Year", years);
+                </script></div>
+
+            <p class="section-label">Specifications & History</p>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
+                <div id="5thbox"></div>
+                <script>loadComponent("5thbox", "Transmission", ["Automatic", "Manual"])</script>
+                <div id="6thbox"></div>
+                <script>loadComponent("6thbox", "Region", ["Riyadh","Dammam","Jeddah","Al-Medina","Makkah","Khobar","Jubail","Al-Ahsa","Abha","Qassim","Najran","Jazan","Aseer","Taef","Wadi Dawasir","Yanbu","Hail","Hafar Al-Batin","Al-Jouf","Al-Baha","Arar","Qurayyat","Besha","Sabya","Al-Namas","Sakaka"])</script>
+                <div id="7thbox"></div>
+                <script>loadComponent("7thbox", "Origin", ["Saudi","Gulf Arabic","Other","Unknown"])</script>
+                <div id="8thbox"></div>
+                <script>loadComponent("8thbox", "Engine size", [])</script>
+                <script>linkDropdowns("2ndbox", "8thbox", carEngines)</script>
+                <div>
+                    <label class="block text-gray-500 text-xs tracking-widest uppercase mb-1.5">Negotiable</label>
+                    <div class="w-full bg-gray-900 border border-gray-700/60 rounded-xl px-3 py-2.5 flex items-center gap-2.5 hover:border-violet-500/50 transition-colors cursor-pointer" onclick="this.querySelector('input').click()">
+                        <input type="checkbox" name="Negotiable" id="negotiable" class="w-4 h-4 accent-violet-500 cursor-pointer appearance-none border border-gray-600 rounded bg-gray-800 checked:bg-violet-500 checked:border-violet-500">
+                        <span class="text-sm text-white/40" id="negotiableLabel">No</span>
+                    </div>
+                    <script>
+                        document.getElementById('negotiable').addEventListener('change', function() {
+                            document.getElementById('negotiableLabel').textContent = this.checked ? 'Yes' : 'No';
+                        });
+                    </script>
+                </div>
+                <div>
+                    <label class="block text-gray-500 text-xs tracking-widest uppercase mb-1.5">Mileage</label>
+                    <input id = "mileage" type="number" name="mileage" value="" placeholder="e.g. 50000"
+                        class="w-full bg-gray-900 text-white text-sm border border-gray-700/60 rounded-xl px-3 py-2.5 outline-none hover:border-violet-500/50 focus:border-violet-500/70 transition-colors placeholder-white/20">
+                </div>
+            </div>
+
+            <button id="predictBtn" onclick="predict()" class="w-full py-3.5 rounded-xl bg-red-700 hover:bg-red-600 active:bg-red-800 text-white text-sm font-medium tracking-widest uppercase transition-colors flex items-center justify-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                </svg>
+                <span id="btnText">Estimate Price</span>
+                <svg id="spinner" class="hidden animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                </svg>
+            </button>
+
+            <div id="result" class="hidden mt-5 rounded-xl overflow-hidden border border-white/5">
+                <div class="bg-red-950/20 px-5 py-4 border-b border-white/5 flex items-center gap-2">
+                    <svg class="w-4 h-4 text-red-400/60" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+                    </svg>
+                    <p class="text-xs text-gray-500 uppercase tracking-widest">Estimated Market Value</p>
+                </div>
+                <div class="bg-black/20 px-5 py-5 text-center">
+                    <p id="resultValue" class="text-3xl font-light text-white tracking-tight"></p>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <footer class="bg-slate-800/20 py-8 px-6 border-t border-white/5">
+        <div class="max-w-3xl mx-auto flex flex-col items-center gap-4">
+
+            <p class="text-gray-700 text-xs text-center leading-relaxed">
+                This model was trained on Saudi Arabian 13k used car listings. Predictions are estimates only and should not be used as a substitute for professional valuation.
+            </p>
+
+
+            <div class="w-16 h-px bg-gray-800"></div>
+
+
+            <a href="https://x.com/ksuAIClub" target="_blank"
+               class="flex items-center gap-2 text-gray-600 hover:text-white transition-colors text-xs group">
+                <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.747l7.73-8.835L1.254 2.25H8.08l4.259 5.63 5.905-5.63Zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                </svg>
+                <span class="group-hover:underline underline-offset-4">@ksuAIClub</span>
+            </a>
+
+        </div>
+    </footer>
+
+    <script>
+        async function predict() {
+            const btn = document.getElementById('predictBtn');
+            const spinner = document.getElementById('spinner');
+            const btnText = document.getElementById('btnText');
+            const result = document.getElementById('result');
+
+            // Loading state
+            btn.disabled = true;
+            btn.classList.add('opacity-70', 'cursor-not-allowed');
+            spinner.classList.remove('hidden');
+            btnText.textContent = 'Predicting...';
+            result.classList.add('hidden');
+
+            try {
+                const response = await fetch('http://127.0.0.1:8000/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        Make:        document.getElementById('1stbox').querySelector('select').value,
+                        Type:        document.getElementById('2ndbox').querySelector('select').value,
+                        Region:      document.getElementById('6thbox').querySelector('select').value,
+                        Gear_Type:   document.getElementById('5thbox').querySelector('select').value == "Automatic" ? 1 : 0,
+                        Origin:      document.getElementById('7thbox').querySelector('select').value,
+                        Options:     document.getElementById('3rdbox').querySelector('select').value,
+                        Engine_Size: parseFloat(document.getElementById('8thbox').querySelector('select').value),
+                        Mileage:     parseInt(document.querySelector('#mileage').value),
+                        Negotiable:  document.querySelector('#negotiable').checked ? 1 : 0,                        
+                        CarAge:      new Date().getFullYear() - parseInt(document.getElementById('4thbox').querySelector('select').value)
+                    })
+                });
+                const data = await response.json();
+                if(data == "[object Object]") throw TypeError("InvalidInput");
+                const formatter = new Intl.NumberFormat('en-SA', {
+                    style: 'currency',
+                    currency: 'SAR',
+                });
+                const formattedString = formatter.format(data);
+                document.getElementById('resultValue').textContent = formattedString;
+                result.classList.remove('hidden');
+
+            }catch(err){
+                if(err instanceof TypeError){
+                    document.getElementById('resultValue').textContent = 'Invalid Input';
+                }
+                else{
+                    document.getElementById('resultValue').textContent = 'Could not reach server';
+                }
+                    result.classList.remove('hidden');
+            }finally{
+                btn.disabled = false;
+                btn.classList.remove('opacity-70', 'cursor-not-allowed');
+                spinner.classList.add('hidden');
+                btnText.textContent = 'Predict Price';
+            }
+        }
+    </script>
+
+</body>
+</html>
