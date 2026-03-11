@@ -26,7 +26,6 @@ class carinput(BaseModel):
     CarAge: int
 
 app = FastAPI()
-app.mount("/", StaticFiles(directory="../frontend", html=True), name="frontend")
 
 url_list = [
         "http://127.0.0.1:8000",
@@ -47,3 +46,5 @@ def prediction(input_data: carinput):
     transformed_data = preprocessor.transform(input_data)
     result = model.predict(transformed_data)
     return round(sum((np.exp(result)).tolist()))
+
+app.mount("/", StaticFiles(directory=f"{parent_path.parent}/frontend", html=True), name="frontend")
