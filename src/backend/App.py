@@ -10,9 +10,10 @@ import shap
 import os
 from groq import Groq
 from dotenv import load_dotenv
+
 load_dotenv()
 
-client = Groq(api_key=os.getenv("GROQ_API_KEY")) 
+client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 parent_path = pathlib.Path(__file__).parent
 model_path = f"{parent_path}/car_price_model/car_price_model.pkl"
@@ -38,19 +39,20 @@ class carinput(BaseModel):
     Mileage: int
     Negotiable: int
     CarAge: int
+    Listed_Price: float | None = None
 
 app = FastAPI()
 
 url_list = [
-        "http://127.0.0.1:8000",
-        "http://127.0.0.1:5500"
+    "http://127.0.0.1:8000",
+    "http://127.0.0.1:5500"
 ]
 
 app.add_middleware(
-  CORSMiddleware,
-  allow_origins = url_list,
-  allow_methods = ["*"],
-  allow_headers = ["*"]
+    CORSMiddleware,
+    allow_origins=url_list,
+    allow_methods=["*"],
+    allow_headers=["*"]
 )
 
 def format_feature_name(name: str):
@@ -74,18 +76,22 @@ def generate_reasoning(shap_values, feature_names, top_k=4):
 
         readable = format_feature_name(feature)
         field = readable.split(" (")[0]
-    
+
         if "(" in readable:
             readable = readable.split("(")[1].replace(")", "").strip()
-        readable = readable.replace("CarAge", "car age").replace("Mileage", "mileage").replace("Engine", "engine size")
+
+        readable = (
+            readable.replace("CarAge", "car age")
+            .replace("Mileage", "mileage")
+            .replace("Engine", "engine size")
+        )
 
         if field in used_fields:
             continue
 
-        direction = "increased" if value > 0 else "decreased"
         action = "adds value" if value > 0 else "reduces value"
         reasoning.append(f"{readable} {action}")
-        
+
         used_fields.add(field)
 
         if len(reasoning) == top_k:
@@ -96,28 +102,29 @@ def generate_reasoning(shap_values, feature_names, top_k=4):
 def generate_summary(price, reasoning):
     if not reasoning:
         return f"The estimated price is {price:,} SAR."
+
     prompt = f"""
-            You are a car pricing expert. Write ONE short paragraph explaining a used car price estimate.
+You are a car pricing expert. Write ONE short paragraph explaining a used car price estimate.
 
-            STRICT RULES:
-            - Maximum 2 sentences
-            - Do NOT start with "Based on"
-            - Do NOT use "we", "our", "I", "you"
-            - Do NOT mention SHAP, machine learning, or feature engineering
-            - Do NOT copy the factor phrases word for word
-            - Write the car naturally (e.g. "Audi A4" not "Make (Audi)")
-            - Sound like a market expert, not a chatbot
+STRICT RULES:
+- Maximum 2 sentences
+- Do NOT start with "Based on"
+- Do NOT use "we", "our", "I", "you"
+- Do NOT mention SHAP, machine learning, or feature engineering
+- Do NOT copy the factor phrases word for word
+- Write the car naturally
+- Sound like a market expert, not a chatbot
 
-            EXAMPLE OF GOOD OUTPUT:
-            "The Audi A4 is estimated at 55,977 SAR. Its premium brand value and older age push the price up, while the low mileage slightly offsets it."
+EXAMPLE OF GOOD OUTPUT:
+"The Audi A4 is estimated at 55,977 SAR. Its premium brand value and older age push the price up, while the low mileage slightly offsets it."
 
-            Predicted price: {price} SAR
+Predicted price: {price} SAR
 
-            Factors:
-            {chr(10).join(f"- {item}" for item in reasoning)}
+Factors:
+{chr(10).join(f"- {item}" for item in reasoning)}
 
-            Now write the explanation:
-            """
+Now write the explanation:
+"""
 
     try:
         response = client.chat.completions.create(
@@ -145,6 +152,30 @@ def generate_summary(price, reasoning):
     text = ", ".join(r.lower() for r in reasoning[:-1]) + f", and {reasoning[-1].lower()}"
     return f"The estimated price is {price:,} SAR. The most important factors are that {text}."
 
+def get_recommendation(predicted_price, listed_price):
+    diff_percentage = ((listed_price - predicted_price) / predicted_price) * 100
+
+    if diff_percentage > 30:
+        recommendation = "The car is significantly overpriced. It is not recommended to buy it."
+    elif diff_percentage > 15:
+        recommendation = "The car is overpriced. Negotiation is recommended before buying."
+    elif diff_percentage >= -10:
+        recommendation = "The listed price is fair and close to the expected market value."
+    else:
+        recommendation = "The car appears to be a good deal because it is priced below the expected value."
+
+    return recommendation, round(diff_percentage, 2)
+
+def get_recommendation_reason(predicted_price, listed_price):
+    diff_percentage = round(((listed_price - predicted_price) / predicted_price) * 100, 2)
+
+    if diff_percentage > 0:
+        return f"The listed price is {diff_percentage}% higher than the estimated market value."
+    elif diff_percentage < 0:
+        return f"The listed price is {abs(diff_percentage)}% lower than the estimated market value."
+    else:
+        return "The listed price matches the estimated market value exactly."
+
 @app.post("/predict")
 def prediction(input_data: carinput):
     input_df = pd.DataFrame([input_data.model_dump()])
@@ -162,10 +193,23 @@ def prediction(input_data: carinput):
     reasoning = generate_reasoning(shap_values, feature_names)
     summary = generate_summary(predicted_price, reasoning)
 
-    return {
+    response = {
         "predicted_price": predicted_price,
         "reasoning": reasoning,
-        "summary": summary
+        "summary": summary,
+        "recommendation": None,
+        "recommendation_reason": None,
+        "difference_percentage": None
     }
+
+    if input_data.Listed_Price is not None:
+        recommendation, diff_percentage = get_recommendation(predicted_price, input_data.Listed_Price)
+        recommendation_reason = get_recommendation_reason(predicted_price, input_data.Listed_Price)
+
+        response["recommendation"] = recommendation
+        response["recommendation_reason"] = recommendation_reason
+        response["difference_percentage"] = diff_percentage
+
+    return response
 
 app.mount("/", StaticFiles(directory=f"{parent_path.parent}/frontend", html=True), name="frontend")
