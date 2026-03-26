@@ -16,10 +16,10 @@ load_dotenv()
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 parent_path = pathlib.Path(__file__).parent
-model_path = f"{parent_path}/car_price_model/car_price_model.pkl"
-preprocessor_path = f"{parent_path}/car_price_model/preprocessor.pkl"
-background_path = f"{parent_path}/car_price_model/background_data.pkl"
-feature_names_path = f"{parent_path}/car_price_model/feature_names.pkl"
+model_path = f"{parent_path}/car_price_model/linear_regression_model/linear_model.pkl"
+preprocessor_path = f"{parent_path}/car_price_model/linear_regression_model/linear_preprocessor.pkl"
+background_path = f"{parent_path}/car_price_model/linear_regression_model/linear_background_data.pkl"
+feature_names_path= f"{parent_path}/car_price_model/linear_regression_model/linear_feature_names.pkl"
 
 model = joblib.load(model_path)
 preprocessor = joblib.load(preprocessor_path)
