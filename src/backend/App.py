@@ -33,6 +33,17 @@ preprocessor_list = [joblib.load(regression_preprocessor_path),joblib.load(xgboo
 background_data_list = [joblib.load(regression_background_path),joblib.load(xgboost_background_path)]
 feature_names_list = [joblib.load(regression_feature_names_path),joblib.load(xgboost_feature_names_path)]
 
+print("=== LINEAR feature names (pkl) ===")
+print(feature_names_list[0][:10])
+
+print("=== XGBOOST feature names (pkl) ===")
+print(feature_names_list[1][:10])
+
+print("=== LINEAR preprocessor output names ===")
+print(list(preprocessor_list[0].get_feature_names_out())[:10])
+
+print("=== XGBOOST preprocessor output names ===")
+
 class carinput(BaseModel):
     Make: str
     Type: str
@@ -80,53 +91,69 @@ def prediction(input_data: carinput):
         model_for_shap = model_list[model_index]
         selected_data = transformed_data
 
-    explainer = shap.Explainer(model_for_shap, background_data_list[model_index])
-    shap_values = explainer(selected_data)
+    if model_index == 0:  # Linear RFECV
+        explainer = shap.LinearExplainer(
+            model_for_shap, 
+            background_data_list[0]
+        )
+        shap_values = explainer(selected_data)
 
-    def format_feature_name(name: str):
-        name = name.replace("cat__", "").replace("num__", "")
-        if "_" in name:
-            field, value = name.split("_", 1)
-            return f"{field} ({value})"
-        return name
+    else:  # XGBoost
+        explainer = shap.TreeExplainer(model_for_shap)
+        shap_values = explainer(selected_data)
 
-    def generate_reasoning(shap_values, feature_names, top_k=4):
+
+
+    def generate_reasoning(shap_values, feature_names, top_k=4, decoded_map=None):
         values = shap_values.values[0]
         pairs = list(zip(feature_names, values))
         pairs.sort(key=lambda x: abs(x[1]), reverse=True)
+
+        human_names = {
+            "Engine_Size": "engine size",
+            "CarAge": "car age",
+            "Mileage": "mileage",
+            "Gear_Type": "transmission",
+            "Negotiable": "negotiable",
+            "Make": "make",
+            "Type": "type",
+            "Region": "region",
+            "Origin": "origin",
+            "Options": "options",
+        }
 
         reasoning = []
         used_fields = set()
 
         for feature, value in pairs:
-            if abs(value) < 1e-8:
-                continue
+            if abs(value) < 1e-8 or len(reasoning) == top_k:
+                break
 
-            readable = format_feature_name(feature)
-            field = readable.split(" (")[0]
-
-            if "(" in readable:
-                readable = readable.split("(")[1].replace(")", "").strip()
-
-            readable = (
-                readable.replace("CarAge", "car age")
-                .replace("Mileage", "mileage")
-                .replace("Engine", "engine size")
-            )
+            if decoded_map and feature in decoded_map:
+                
+                readable = decoded_map[feature]
+                field = feature
+            else:
+              
+                name = feature.replace("cat__", "").replace("num__", "")
+                if "_" in name:
+                    field, readable = name.split("_", 1)
+                else:
+                    field = name
+                    readable = human_names.get(name, name.lower())
+                readable = (readable
+                    .replace("CarAge", "car age")
+                    .replace("Mileage", "mileage")
+                    .replace("Engine_Size", "engine size"))
 
             if field in used_fields:
                 continue
 
             action = "adds value" if value > 0 else "reduces value"
             reasoning.append(f"{readable} {action}")
-
             used_fields.add(field)
 
-            if len(reasoning) == top_k:
-                break
-
         return reasoning
-
     def generate_summary(price, reasoning):
         if not reasoning:
             return f"The estimated price is {price:,} SAR."
@@ -204,7 +231,23 @@ def prediction(input_data: carinput):
         else:
             return "The listed price matches the estimated market value exactly."
 
-    reasoning = generate_reasoning(shap_values, feature_names_list[model_index])
+    if model_index == 1:
+        ordinal_encoder = preprocessor_list[1].named_transformers_['cat']
+        cat_cols = ["Make", "Type", "Region", "Origin", "Options", "Gear_Type"]
+        decoded_map = {}
+        for i, col in enumerate(cat_cols):
+            encoded_val = transformed_data[0][3 + i]
+            categories = ordinal_encoder.categories_[i]
+            idx = int(round(encoded_val))
+            decoded_map[col] = categories[idx] if 0 <= idx < len(categories) else col
+        decoded_map["Engine_Size"] = f"{input_data.Engine_Size}L engine"
+        decoded_map["Mileage"]     = f"{input_data.Mileage:,} km mileage"
+        decoded_map["CarAge"]      = f"{input_data.CarAge} year old car" if input_data.CarAge > 0 else "brand new car"
+        decoded_map["Negotiable"]  = "negotiable listing" if input_data.Negotiable else "non-negotiable listing"
+        reasoning = generate_reasoning(shap_values, feature_names_list[1], decoded_map=decoded_map)
+    else:
+        reasoning = generate_reasoning(shap_values, feature_names_list[0])
+
     summary = generate_summary(predicted_price, reasoning)
 
     response = {
