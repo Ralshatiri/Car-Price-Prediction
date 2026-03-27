@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+joblib
+pandas
+numpy
+shap
+xgboost
+scikit-learn
+groq
+python-dotenv
+scipy
+tqdm
+pydantic
+httpx
+cloudpickle
