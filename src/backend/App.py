@@ -6,6 +6,7 @@ import pathlib
 import pandas as pd
 import numpy as np
 from pydantic import BaseModel
+from typing import Literal
 import shap
 import os
 from groq import Groq
@@ -16,17 +17,21 @@ load_dotenv()
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 parent_path = pathlib.Path(__file__).parent
-model_path = f"{parent_path}/car_price_model/linear_regression_model/linear_model.pkl"
-preprocessor_path = f"{parent_path}/car_price_model/linear_regression_model/linear_preprocessor.pkl"
-background_path = f"{parent_path}/car_price_model/linear_regression_model/linear_background_data.pkl"
-feature_names_path= f"{parent_path}/car_price_model/linear_regression_model/linear_feature_names.pkl"
 
-model = joblib.load(model_path)
-preprocessor = joblib.load(preprocessor_path)
-background_data = joblib.load(background_path)
-feature_names = joblib.load(feature_names_path)
+regression_model_path = f"{parent_path}/car_price_model/linear_regression_model/linear_model.pkl"
+regression_preprocessor_path = f"{parent_path}/car_price_model/linear_regression_model/linear_preprocessor.pkl"
+regression_background_path = f"{parent_path}/car_price_model/linear_regression_model/linear_background_data.pkl"
+regression_feature_names_path= f"{parent_path}/car_price_model/linear_regression_model/linear_feature_names.pkl"
 
-explainer = shap.Explainer(model.estimator_, background_data)
+xgboost_model_path = f"{parent_path}/car_price_model/xgboost_model/xgboost_model.pkl"
+xgboost_preprocessor_path = f"{parent_path}/car_price_model/xgboost_model/xgboost_preprocessor.pkl"
+xgboost_background_path = f"{parent_path}/car_price_model/xgboost_model/xgboost_background_data.pkl"
+xgboost_feature_names_path= f"{parent_path}/car_price_model/xgboost_model/xgboost_feature_names.pkl"
+
+model_list = [joblib.load(regression_model_path),joblib.load(xgboost_model_path)]
+preprocessor_list = [joblib.load(regression_preprocessor_path),joblib.load(xgboost_preprocessor_path)]
+background_data_list = [joblib.load(regression_background_path),joblib.load(xgboost_background_path)]
+feature_names_list = [joblib.load(regression_feature_names_path),joblib.load(xgboost_feature_names_path)]
 
 class carinput(BaseModel):
     Make: str
@@ -40,6 +45,7 @@ class carinput(BaseModel):
     Negotiable: int
     CarAge: int
     Listed_Price: float | None = None
+    model: Literal[0, 1]
 
 app = FastAPI()
 
@@ -55,142 +61,150 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-def format_feature_name(name: str):
-    name = name.replace("cat__", "").replace("num__", "")
-    if "_" in name:
-        field, value = name.split("_", 1)
-        return f"{field} ({value})"
-    return name
-
-def generate_reasoning(shap_values, feature_names, top_k=4):
-    values = shap_values.values[0]
-    pairs = list(zip(feature_names, values))
-    pairs.sort(key=lambda x: abs(x[1]), reverse=True)
-
-    reasoning = []
-    used_fields = set()
-
-    for feature, value in pairs:
-        if abs(value) < 1e-8:
-            continue
-
-        readable = format_feature_name(feature)
-        field = readable.split(" (")[0]
-
-        if "(" in readable:
-            readable = readable.split("(")[1].replace(")", "").strip()
-
-        readable = (
-            readable.replace("CarAge", "car age")
-            .replace("Mileage", "mileage")
-            .replace("Engine", "engine size")
-        )
-
-        if field in used_fields:
-            continue
-
-        action = "adds value" if value > 0 else "reduces value"
-        reasoning.append(f"{readable} {action}")
-
-        used_fields.add(field)
-
-        if len(reasoning) == top_k:
-            break
-
-    return reasoning
-
-def generate_summary(price, reasoning):
-    if not reasoning:
-        return f"The estimated price is {price:,} SAR."
-
-    prompt = f"""
-You are a car pricing expert. Write ONE short paragraph explaining a used car price estimate.
-
-STRICT RULES:
-- Maximum 2 sentences
-- Do NOT start with "Based on"
-- Do NOT use "we", "our", "I", "you"
-- Do NOT mention SHAP, machine learning, or feature engineering
-- Do NOT copy the factor phrases word for word
-- Write the car naturally
-- Sound like a market expert, not a chatbot
-
-EXAMPLE OF GOOD OUTPUT:
-"The Audi A4 is estimated at 55,977 SAR. Its premium brand value and older age push the price up, while the low mileage slightly offsets it."
-
-Predicted price: {price} SAR
-
-Factors:
-{chr(10).join(f"- {item}" for item in reasoning)}
-
-Now write the explanation:
-"""
-
-    try:
-        response = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a car pricing expert. Never use 'we', 'our', 'I', or 'you'. Always write in third person about the car only."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-        )
-        summary = response.choices[0].message.content.strip()
-        if summary:
-            return summary
-    except Exception:
-        pass
-
-    if len(reasoning) == 1:
-        return f"The estimated price is {price:,} SAR. The main factor is that {reasoning[0].lower()}."
-
-    text = ", ".join(r.lower() for r in reasoning[:-1]) + f", and {reasoning[-1].lower()}"
-    return f"The estimated price is {price:,} SAR. The most important factors are that {text}."
-
-def get_recommendation(predicted_price, listed_price):
-    diff_percentage = ((listed_price - predicted_price) / predicted_price) * 100
-
-    if diff_percentage > 30:
-        recommendation = "The car is significantly overpriced. It is not recommended to buy it."
-    elif diff_percentage > 15:
-        recommendation = "The car is overpriced. Negotiation is recommended before buying."
-    elif diff_percentage >= -10:
-        recommendation = "The listed price is fair and close to the expected market value."
-    else:
-        recommendation = "The car appears to be a good deal because it is priced below the expected value."
-
-    return recommendation, round(diff_percentage, 2)
-
-def get_recommendation_reason(predicted_price, listed_price):
-    diff_percentage = round(((listed_price - predicted_price) / predicted_price) * 100, 2)
-
-    if diff_percentage > 0:
-        return f"The listed price is {diff_percentage}% higher than the estimated market value."
-    elif diff_percentage < 0:
-        return f"The listed price is {abs(diff_percentage)}% lower than the estimated market value."
-    else:
-        return "The listed price matches the estimated market value exactly."
-
 @app.post("/predict")
 def prediction(input_data: carinput):
-    input_df = pd.DataFrame([input_data.model_dump()])
-    transformed_data = preprocessor.transform(input_df)
+    model_index = input_data.model
+    input_df = pd.DataFrame([input_data.model_dump(exclude={'model'})])
+    transformed_data = preprocessor_list[model_index].transform(input_df)
 
     if hasattr(transformed_data, "toarray"):
         transformed_data = transformed_data.toarray()
 
-    prediction_log = model.predict(transformed_data)
+    prediction_log = model_list[model_index].predict(transformed_data)
     predicted_price = round(float(np.exp(prediction_log[0])))
 
-    selected_data = transformed_data[:, model.support_]
+    if model_index == 0:  # RFECV linear model
+        model_for_shap = model_list[model_index].estimator_
+        selected_data = transformed_data[:, model_list[model_index].support_]
+    else:  # plain XGBRegressor
+        model_for_shap = model_list[model_index]
+        selected_data = transformed_data
+
+    explainer = shap.Explainer(model_for_shap, background_data_list[model_index])
     shap_values = explainer(selected_data)
 
-    reasoning = generate_reasoning(shap_values, feature_names)
+    def format_feature_name(name: str):
+        name = name.replace("cat__", "").replace("num__", "")
+        if "_" in name:
+            field, value = name.split("_", 1)
+            return f"{field} ({value})"
+        return name
+
+    def generate_reasoning(shap_values, feature_names, top_k=4):
+        values = shap_values.values[0]
+        pairs = list(zip(feature_names, values))
+        pairs.sort(key=lambda x: abs(x[1]), reverse=True)
+
+        reasoning = []
+        used_fields = set()
+
+        for feature, value in pairs:
+            if abs(value) < 1e-8:
+                continue
+
+            readable = format_feature_name(feature)
+            field = readable.split(" (")[0]
+
+            if "(" in readable:
+                readable = readable.split("(")[1].replace(")", "").strip()
+
+            readable = (
+                readable.replace("CarAge", "car age")
+                .replace("Mileage", "mileage")
+                .replace("Engine", "engine size")
+            )
+
+            if field in used_fields:
+                continue
+
+            action = "adds value" if value > 0 else "reduces value"
+            reasoning.append(f"{readable} {action}")
+
+            used_fields.add(field)
+
+            if len(reasoning) == top_k:
+                break
+
+        return reasoning
+
+    def generate_summary(price, reasoning):
+        if not reasoning:
+            return f"The estimated price is {price:,} SAR."
+
+        prompt = f"""
+    You are a car pricing expert. Write ONE short paragraph explaining a used car price estimate.
+
+    STRICT RULES:
+    - Maximum 2 sentences
+    - Do NOT start with "Based on"
+    - Do NOT use "we", "our", "I", "you"
+    - Do NOT mention SHAP, machine learning, or feature engineering
+    - Do NOT copy the factor phrases word for word
+    - Write the car naturally
+    - Sound like a market expert, not a chatbot
+
+    EXAMPLE OF GOOD OUTPUT:
+    "The Audi A4 is estimated at 55,977 SAR. Its premium brand value and older age push the price up, while the low mileage slightly offsets it."
+
+    Predicted price: {price} SAR
+
+    Factors:
+    {chr(10).join(f"- {item}" for item in reasoning)}
+
+    Now write the explanation:
+    """
+
+        try:
+            response = client.chat.completions.create(
+                model="llama-3.1-8b-instant",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a car pricing expert. Never use 'we', 'our', 'I', or 'you'. Always write in third person about the car only."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+            )
+            summary = response.choices[0].message.content.strip()
+            if summary:
+                return summary
+        except Exception:
+            pass
+
+        if len(reasoning) == 1:
+            return f"The estimated price is {price:,} SAR. The main factor is that {reasoning[0].lower()}."
+
+        text = ", ".join(r.lower() for r in reasoning[:-1]) + f", and {reasoning[-1].lower()}"
+        return f"The estimated price is {price:,} SAR. The most important factors are that {text}."
+
+    def get_recommendation(predicted_price, listed_price):
+        diff_percentage = ((listed_price - predicted_price) / predicted_price) * 100
+
+        if diff_percentage > 30:
+            recommendation = "The car is significantly overpriced. It is not recommended to buy it."
+        elif diff_percentage > 15:
+            recommendation = "The car is overpriced. Negotiation is recommended before buying."
+        elif diff_percentage >= -10:
+            recommendation = "The listed price is fair and close to the expected market value."
+        else:
+            recommendation = "The car appears to be a good deal because it is priced below the expected value."
+
+        return recommendation, round(diff_percentage, 2)
+
+    def get_recommendation_reason(predicted_price, listed_price):
+        diff_percentage = round(((listed_price - predicted_price) / predicted_price) * 100, 2)
+
+        if diff_percentage > 0:
+            return f"The listed price is {diff_percentage}% higher than the estimated market value."
+        elif diff_percentage < 0:
+            return f"The listed price is {abs(diff_percentage)}% lower than the estimated market value."
+        else:
+            return "The listed price matches the estimated market value exactly."
+
+    reasoning = generate_reasoning(shap_values, feature_names_list[model_index])
     summary = generate_summary(predicted_price, reasoning)
 
     response = {
