@@ -5,7 +5,7 @@ pandas
 numpy
 shap
 xgboost
-scikit-learn
+scikit-learn==1.6.1
 groq
 python-dotenv
 scipy
