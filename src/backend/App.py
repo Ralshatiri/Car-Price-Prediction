@@ -267,6 +267,11 @@ def prediction(input_data: carinput):
 
     return response
     
-print(f"Frontend path: {parent_path.parent}/frontend")
-print(f"Parent path: {parent_path}")
-app.mount("/", StaticFiles(directory=f"{parent_path.parent}/frontend", html=True), name="frontend")
+frontend_path = pathlib.Path(__file__).parent.parent / "frontend"
+print(f"Frontend exists: {frontend_path.exists()}")
+print(f"Frontend path: {frontend_path}")
+
+if frontend_path.exists():
+    app.mount("/", StaticFiles(directory=str(frontend_path), html=True), name="frontend")
+else:
+    print("WARNING: Frontend folder not found!")
