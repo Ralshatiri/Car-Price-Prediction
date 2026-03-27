@@ -242,21 +242,28 @@
     <script>
         let selectedModel = 'xgboost';
         let currentLang = 'en';
-async function toggleLang() {
+        let translations = {};
+
+        async function toggleLang() {
             currentLang = currentLang === 'en' ? 'ar' : 'en';
             document.getElementById('langBtn').textContent = currentLang === 'en' ? 'AR' : 'EN';
             document.documentElement.lang = currentLang;
             document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
 
-            const res = await fetch(`/i18n/${currentLang}.json`);
-            const t = await res.json();
+            try {
+                const res = await fetch(`/i18n/${currentLang}.json`);
+                if (!res.ok) throw new Error(`Failed to load /i18n/${currentLang}.json (${res.status})`);
+                translations = await res.json();
+            } catch (err) {
+                console.error('i18n load failed:', err);
+                return;
+            }
 
             document.querySelectorAll('[data-i18n]').forEach(el => {
                 const key = el.getAttribute('data-i18n');
-                if (t[key]) el.textContent = t[key];
+                if (translations[key]) el.textContent = translations[key];
             });
 
-            // Update dropdown labels
             const dropdownMap = {
                 '1stbox': 'field_make', '2ndbox': 'field_type', '3rdbox': 'field_options',
                 '4thbox': 'field_year', '5thbox': 'field_transmission', '6thbox': 'field_region',
@@ -264,7 +271,7 @@ async function toggleLang() {
             };
             Object.entries(dropdownMap).forEach(([id, key]) => {
                 const label = document.getElementById(id)?.querySelector('label');
-                if (label && t[key]) label.textContent = t[key];
+                if (translations[key]) label.textContent = translations[key];
             });
         }
 
@@ -396,7 +403,7 @@ async function toggleLang() {
             btn.disabled = true;
             btn.classList.add('opacity-70', 'cursor-not-allowed');
             spinner.classList.remove('hidden');
-            btnText.textContent = 'Predicting...';
+            btnText.textContent = translations['btn_predicting'] || 'Predicting...';
             result.classList.add('hidden');
 
             const make = document.getElementById('1stbox').querySelector('select').value;
@@ -438,7 +445,7 @@ async function toggleLang() {
                 btn.disabled = false;
                 btn.classList.remove('opacity-70', 'cursor-not-allowed');
                 spinner.classList.add('hidden');
-                btnText.textContent = 'Estimate Price';
+                btnText.textContent = translations['btn_estimate'] || 'Estimate Price';
                 return;
             }
 
@@ -480,19 +487,28 @@ async function toggleLang() {
                 document.getElementById('errorText').classList.add('hidden');
                 document.getElementById('summarySection').classList.remove('hidden');
                 document.getElementById('resultValue').textContent = formatter.format(data.predicted_price);
-                document.getElementById('summaryText').textContent = data.summary || '';
-                document.getElementById('recommendationText').textContent = data.recommendation || '';
-                document.getElementById('recommendationReasonText').textContent = data.recommendation_reason || '';
+                async function Translate(text) {
+                    if (currentLang !== 'ar' || !text) return text;
+                    try {
+                        const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|ar`);
+                        const json = await res.json();
+                        return json.responseData?.translatedText || text;
+                    } catch { return text; }
+                }
+
+                document.getElementById('summaryText').textContent = await Translate(data.summary || '');
+                document.getElementById('recommendationText').textContent = await Translate(data.recommendation || '');
+                document.getElementById('recommendationReasonText').textContent = await Translate(data.recommendation_reason || '');
 
                 const reasoningList = document.getElementById('reasoningList');
                 reasoningList.innerHTML = '';
 
                 if (Array.isArray(data.reasoning)) {
-                    data.reasoning.forEach(item => {
+                    for (const item of data.reasoning) {
                         const li = document.createElement('li');
-                        li.textContent = item;
+                        li.textContent = await Translate(item);
                         reasoningList.appendChild(li);
-                    });
+                    }
                 }
 
                 result.classList.remove('hidden');
@@ -510,7 +526,7 @@ async function toggleLang() {
                 btn.disabled = false;
                 btn.classList.remove('opacity-70', 'cursor-not-allowed');
                 spinner.classList.add('hidden');
-                btnText.textContent = 'Estimate Price';
+                btnText.textContent = translations['btn_estimate'] || 'Estimate Price';
             }
         }
     </script>

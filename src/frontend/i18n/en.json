@@ -19,6 +19,7 @@
   "field_mileage": "Mileage",
   "field_seller_price": "Seller Price",
   "btn_estimate": "Estimate Price",
+  "btn_predicting": "Predicting...",
   "result_market_value": "Estimated Market Value",
   "result_summary": "Summary",
   "result_recommendation": "Recommendation",

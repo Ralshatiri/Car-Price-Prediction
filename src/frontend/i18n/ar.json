@@ -19,6 +19,7 @@
   "field_mileage": "المسافة المقطوعة",
   "field_seller_price": "سعر البائع",
   "btn_estimate": "تقدير السعر",
+  "btn_predicting": "جاري التقدير...",
   "result_market_value": "القيمة السوقية المقدرة",
   "result_summary": "الملخص",
   "result_recommendation": "التوصية",
