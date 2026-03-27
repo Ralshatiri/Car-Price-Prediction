@@ -60,10 +60,7 @@ class carinput(BaseModel):
 
 app = FastAPI()
 
-url_list = [
-    "http://127.0.0.1:8000",
-    "http://127.0.0.1:5500"
-]
+url_list = ["*"]
 
 app.add_middleware(
     CORSMiddleware,
@@ -71,6 +68,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"]
 )
+
 
 @app.post("/predict")
 def prediction(input_data: carinput):
@@ -268,5 +266,7 @@ def prediction(input_data: carinput):
         response["difference_percentage"] = diff_percentage
 
     return response
-
+    
+print(f"Frontend path: {parent_path.parent}/frontend")
+print(f"Parent path: {parent_path}")
 app.mount("/", StaticFiles(directory=f"{parent_path.parent}/frontend", html=True), name="frontend")
