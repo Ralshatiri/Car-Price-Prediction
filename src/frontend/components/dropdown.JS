@@ -410,15 +410,15 @@ const carEngines = {
 
 function loadComponent(id, label, options) {
     const optionTags = `<option value="" selected disabled hidden>${label}</option>` + options.map(opt =>
-        `<option value="${opt}">${opt}</option>`
+        `<option class="bg-black/[0.75]" value="${opt}">${opt}</option>`
     ).join('');
 
     document.getElementById(id).innerHTML = `
-        <label class="block text-gray-500 text-xs tracking-widest uppercase mb-1.5">${label}</label>
+        <label class="block text-[0.6rem] tracking-[0.35em] uppercase text-white/40 mb-1.5">${label}</label>
         <select
             style="opacity: 0.4"
             onchange="this.style.opacity = this.value ? '1' : '0.4'"
-            class="w-full bg-gray-900 text-white text-sm border border-gray-700/60 rounded-xl px-3 py-2.5 outline-none cursor-pointer hover:border-violet-500/50 transition-colors">
+            class="w-full bg-white/[0.05] text-white text-sm border border-white/[0.06] rounded-xl px-3 py-2.5 outline-none cursor-pointer hover:border-red-400/50 focus:border-red-400/70 transition-colors">
             ${optionTags}
         </select>
     `;
@@ -434,7 +434,7 @@ function linkDropdowns(sourceId, targetId, mapping) {
         const models = mapping[this.value] || [];
 
         const optionTags = `<option value="" selected disabled hidden>${targetLabel}</option>` + models.map(m =>
-            `<option value="${m}">${m}</option>`
+            `<option class="bg-black/[0.75]" value="${m}">${m}</option>`
         ).join('');
 
         targetSelect.innerHTML = optionTags;
