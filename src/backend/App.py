@@ -152,7 +152,7 @@ def prediction(input_data: carinput):
             used_fields.add(field)
 
         return reasoning
-    def generate_summary(price, reasoning):
+    def generate_summary(price, reasoning,input_data):
         if not reasoning:
             return f"The estimated price is {price:,} SAR."
 
@@ -167,6 +167,17 @@ def prediction(input_data: carinput):
     - Do NOT copy the factor phrases word for word
     - Write the car naturally
     - Sound like a market expert, not a chatbot
+
+    Car details:
+    - Make: {input_data.Make}
+    - Type: {input_data.Type}
+    - Engine size: {input_data.Engine_Size}L
+    - Mileage: {input_data.Mileage:,} km
+    - Car age: {input_data.CarAge} years
+    - Transmission: {"Automatic" if input_data.Gear_Type == 1 else "Manual"}
+    - Region: {input_data.Region}
+    - Origin: {input_data.Origin}
+    - Options: {input_data.Options}
 
     EXAMPLE OF GOOD OUTPUT:
     "The Audi A4 is estimated at 55,977 SAR. Its premium brand value and older age push the price up, while the low mileage slightly offsets it."
@@ -228,25 +239,31 @@ def prediction(input_data: carinput):
             return f"The listed price is {abs(diff_percentage)}% lower than the estimated market value."
         else:
             return "The listed price matches the estimated market value exactly."
-
+        
     if model_index == 1:
-        ordinal_encoder = preprocessor_list[1].named_transformers_['cat']
-        cat_cols = ["Make", "Type", "Region", "Origin", "Options", "Gear_Type"]
-        decoded_map = {}
-        for i, col in enumerate(cat_cols):
-            encoded_val = transformed_data[0][3 + i]
-            categories = ordinal_encoder.categories_[i]
-            idx = int(round(encoded_val))
-            decoded_map[col] = categories[idx] if 0 <= idx < len(categories) else col
-        decoded_map["Engine_Size"] = f"{input_data.Engine_Size}L engine"
-        decoded_map["Mileage"]     = f"{input_data.Mileage:,} km mileage"
-        decoded_map["CarAge"]      = f"{input_data.CarAge} year old car" if input_data.CarAge > 0 else "brand new car"
-        decoded_map["Negotiable"]  = "negotiable listing" if input_data.Negotiable else "non-negotiable listing"
-        reasoning = generate_reasoning(shap_values, feature_names_list[1], decoded_map=decoded_map)
+        decoded_map = {
+            "Make": input_data.Make,
+            "Type": input_data.Type,
+            "Region": input_data.Region,
+            "Origin": input_data.Origin,
+            "Options": input_data.Options,
+            "Gear_Type": "automatic transmission" if input_data.Gear_Type == 1 else "manual transmission",
+            "Engine_Size": f"{input_data.Engine_Size}L engine",
+            "Mileage": f"{input_data.Mileage:,} km mileage",
+            "CarAge": f"{input_data.CarAge} year old car" if input_data.CarAge > 0 else "brand new car",
+            "Negotiable": "negotiable listing" if input_data.Negotiable == 1 else "non-negotiable listing",
+            "Listed_Price": f"{input_data.Listed_Price:,.0f} SAR listed price" if input_data.Listed_Price is not None else "listed price"
+        }
+
+        reasoning = generate_reasoning(
+            shap_values,
+            feature_names_list[1],
+            decoded_map=decoded_map
+        )
     else:
         reasoning = generate_reasoning(shap_values, feature_names_list[0])
 
-    summary = generate_summary(predicted_price, reasoning)
+    summary = generate_summary(predicted_price, reasoning,input_data)
 
     response = {
         "predicted_price": predicted_price,
